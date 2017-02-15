@@ -23,12 +23,18 @@ defmodule Identicon do
     %Identicon.Image{hex: hex}
   end
 
-  def create_grid(image) do
-    {hex, color} = {image.hex, image.color}
-    hex = Enum.chunk(hex, 3)
-    |> Enum.map(&mirror_rows/1)
-    |> List.flatten
-    {hex, color}
+  def create_grid(%Identicon.Image{hex: hex} = image) do
+    grid =
+      hex
+      |> Enum.chunk(3)
+      |> Enum.map(&mirror_rows/1)
+      |> List.flatten
+      |> Enum.with_index
+      |> Enum.filter(fn({x, _index}) ->
+          rem(x, 2) == 0
+      end)
+
+    %Identicon.Image{image | grid: grid}
   end
 
   def mirror_rows(chunked_hex) do
@@ -36,25 +42,21 @@ defmodule Identicon do
     chunked_hex ++ [second, first]
   end
   
-  def build_pixel_map({grid, color}) do
+  def build_pixel_map(%Identicon.Image{grid: grid} = image) do
+    pixel_map = Enum.map grid, fn({_code, index}) ->
+      horizontal = rem(index, 5) * 50
+      vertical = div(index, 5) * 50
 
-    pixel_grid = Enum.filter(grid, fn(x) ->
-      rem(x, 2) == 0
-    end)
-    |> Enum.with_index
-    |> Enum.map(fn({_useless, index}) ->
-        horizontal = rem(index, 5) * 50
-        vertical = div(index, 5) * 50
-        top_left = {horizontal, vertical}
-        bottom_right = {horizontal + 50, vertical + 50}
+      top_left = {horizontal, vertical}
+      bottom_right = {horizontal + 50, vertical + 50}
 
-        {top_left, bottom_right}
-    end)
-    IO.puts(pixel_grid)
-    {pixel_grid, color}
+      {top_left, bottom_right}
+    end
+
+    %Identicon.Image{image | pixel_map: pixel_map}
   end
 
-  def draw_image({pixel_map, color}) do
+  def draw_image(%Identicon.Image{pixel_map: pixel_map, color: color}) do
     image = :egd.create(250, 250)
     fill = :egd.color(color)
 
@@ -66,6 +68,6 @@ defmodule Identicon do
   end
 
   def save_image(image, input) do
-    File.write("#{input}.png", image)
+    File.write("results/#{input}.png", image)
   end
 end
